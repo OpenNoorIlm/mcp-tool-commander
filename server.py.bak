@@ -1,0 +1,552 @@
+"""
+fs-shell-mcp: an MCP server giving an AI assistant (Claude, LM Studio, etc.)
+the ability to run shell commands and read/search/write/edit files and
+folders on this machine -- gated by real permission dialogs the user must
+approve.
+
+Run manually:
+    python3 server.py
+
+Configure in your MCP client (Claude Desktop / LM Studio) to launch this
+via stdio -- see README.md.
+"""
+import fnmatch
+import subprocess
+from pathlib import Path
+from urllib.parse import quote_plus, urlparse
+
+import requests
+from bs4 import BeautifulSoup
+from mcp.server.fastmcp import FastMCP
+
+import permissions
+
+mcp = FastMCP("fs-shell-mcp")
+
+EXCLUDE_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".cache", "dist", "build"}
+
+_HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 fs-shell-mcp/1.0"
+    )
+}
+
+
+def _fmt_denied(msg: str) -> str:
+    return f"DENIED: {msg}"
+
+
+# ---------------------------------------------------------------------------
+# Shell commands
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def run_command(command: str, cwd: str = ".", timeout: int = 60) -> str:
+    """
+    Run a shell command on the user's machine. Requires user permission via
+    a desktop popup unless the user has pre-trusted this working directory
+    or enabled always-allow. Returns stdout, stderr, and the exit code.
+
+    Args:
+        command: the shell command to execute (runs via `sh -c`)
+        cwd: working directory to run the command in (default: current dir)
+        timeout: max seconds to allow the command to run (default 60)
+    """
+    resolved_cwd = str(Path(cwd).expanduser().resolve())
+    allowed, msg = permissions.request_command_permission(command, resolved_cwd)
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        result = subprocess.run(
+            command, shell=True, cwd=resolved_cwd,
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return f"ERROR: command timed out after {timeout}s"
+    except OSError as e:
+        return f"ERROR: {e}"
+
+    out = f"[permission: {msg}]\nexit code: {result.returncode}\n"
+    if result.stdout:
+        out += f"--- stdout ---\n{result.stdout}\n"
+    if result.stderr:
+        out += f"--- stderr ---\n{result.stderr}\n"
+    return out
+
+
+# ---------------------------------------------------------------------------
+# File reading
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def read_file(path: str, max_bytes: int = 200_000) -> str:
+    """
+    Read a text file's contents. Read-only; no permission prompt required.
+
+    Args:
+        path: path to the file
+        max_bytes: truncate file content to this many bytes if larger
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        return f"ERROR: file not found: {p}"
+    if not p.is_file():
+        return f"ERROR: not a file: {p}"
+    try:
+        data = p.read_bytes()
+    except OSError as e:
+        return f"ERROR: {e}"
+    truncated = len(data) > max_bytes
+    data = data[:max_bytes]
+    try:
+        text = data.decode("utf-8", errors="replace")
+    except Exception as e:
+        return f"ERROR decoding file: {e}"
+    if truncated:
+        text += f"\n\n[... truncated, file exceeds {max_bytes} bytes ...]"
+    return text
+
+
+@mcp.tool()
+def list_dir(path: str = ".") -> str:
+    """
+    List files and folders inside a directory (non-recursive). Read-only;
+    no permission prompt required.
+
+    Args:
+        path: directory to list
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        return f"ERROR: path not found: {p}"
+    if not p.is_dir():
+        return f"ERROR: not a directory: {p}"
+    entries = []
+    try:
+        for child in sorted(p.iterdir()):
+            kind = "DIR " if child.is_dir() else "FILE"
+            size = "" if child.is_dir() else f" ({child.stat().st_size}B)"
+            entries.append(f"{kind}  {child.name}{size}")
+    except OSError as e:
+        return f"ERROR: {e}"
+    return "\n".join(entries) if entries else "(empty directory)"
+
+
+# ---------------------------------------------------------------------------
+# File writing / creation / editing (permission-gated)
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def create_file(path: str, content: str = "") -> str:
+    """
+    Create a new file with the given content. Fails if the file already
+    exists (use write_file to overwrite, or edit_file to modify). Requires
+    user permission via a desktop popup unless the target folder is
+    pre-whitelisted.
+
+    Args:
+        path: path of the new file to create
+        content: text content to write into the file
+    """
+    p = Path(path).expanduser()
+    if p.exists():
+        return f"ERROR: file already exists: {p} (use write_file to overwrite or edit_file to modify)"
+
+    allowed, msg = permissions.request_file_permission(f"Create new file: {p.name}", str(p.parent))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nCreated {p} ({len(content)} chars)"
+
+
+@mcp.tool()
+def write_file(path: str, content: str, overwrite: bool = True) -> str:
+    """
+    Write content to a file, creating it if needed. If overwrite is False
+    and the file exists, this fails instead of clobbering it. Requires user
+    permission via a desktop popup unless pre-whitelisted.
+
+    Args:
+        path: path of the file to write
+        content: text content to write
+        overwrite: if False, refuse to overwrite an existing file
+    """
+    p = Path(path).expanduser()
+    if p.exists() and not overwrite:
+        return f"ERROR: file already exists and overwrite=False: {p}"
+
+    action = f"Overwrite file: {p.name}" if p.exists() else f"Create file: {p.name}"
+    allowed, msg = permissions.request_file_permission(action, str(p))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nWrote {len(content)} chars to {p}"
+
+
+@mcp.tool()
+def edit_file(path: str, old_str: str, new_str: str, replace_all: bool = False) -> str:
+    """
+    Find-and-replace text within an existing file. By default old_str must
+    appear exactly once in the file (to avoid ambiguous edits); set
+    replace_all=True to replace every occurrence. Requires user permission
+    via a desktop popup unless pre-whitelisted.
+
+    Args:
+        path: path to the file to edit
+        old_str: exact text to find
+        new_str: text to replace it with
+        replace_all: replace every occurrence instead of requiring exactly one
+    """
+    p = Path(path).expanduser()
+    if not p.exists() or not p.is_file():
+        return f"ERROR: file not found: {p}"
+
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as e:
+        return f"ERROR: {e}"
+
+    count = text.count(old_str)
+    if count == 0:
+        return f"ERROR: old_str not found in {p}"
+    if count > 1 and not replace_all:
+        return f"ERROR: old_str appears {count} times in {p}; pass replace_all=True or make old_str more specific"
+
+    allowed, msg = permissions.request_file_permission(f"Edit file: {p.name}", str(p))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    new_text = text.replace(old_str, new_str) if replace_all else text.replace(old_str, new_str, 1)
+    try:
+        p.write_text(new_text, encoding="utf-8")
+    except OSError as e:
+        return f"ERROR: {e}"
+    replaced = count if replace_all else 1
+    return f"[permission: {msg}]\nReplaced {replaced} occurrence(s) in {p}"
+
+
+@mcp.tool()
+def create_folder(path: str) -> str:
+    """
+    Create a folder (and any missing parent folders). Requires user
+    permission via a desktop popup unless pre-whitelisted.
+
+    Args:
+        path: path of the folder to create
+    """
+    p = Path(path).expanduser()
+    if p.exists():
+        return f"Folder already exists: {p}" if p.is_dir() else f"ERROR: path exists and is a file: {p}"
+
+    allowed, msg = permissions.request_file_permission(f"Create folder: {p}", str(p.parent))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nCreated folder {p}"
+
+
+@mcp.tool()
+def append_file(path: str, content: str) -> str:
+    """
+    Append content to the end of an existing file (creates it if missing).
+    Requires user permission via a desktop popup unless pre-whitelisted.
+
+    Args:
+        path: path of the file to append to
+        content: text content to append
+    """
+    p = Path(path).expanduser()
+    if p.exists() and not p.is_file():
+        return f"ERROR: not a file: {p}"
+
+    action = f"Append to file: {p.name}" if p.exists() else f"Create file: {p.name}"
+    allowed, msg = permissions.request_file_permission(action, str(p))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(content)
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nAppended {len(content)} chars to {p}"
+
+
+@mcp.tool()
+def delete_file(path: str) -> str:
+    """
+    Delete a file (not a directory - use delete_folder-style handling via
+    run_command for directories, this is file-only for safety). Requires
+    user permission via a desktop popup unless pre-whitelisted.
+
+    Args:
+        path: path of the file to delete
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        return f"ERROR: file not found: {p}"
+    if not p.is_file():
+        return f"ERROR: not a file (refusing to delete directories with this tool): {p}"
+
+    allowed, msg = permissions.request_file_permission(f"Delete file: {p.name}", str(p))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        p.unlink()
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nDeleted {p}"
+
+
+@mcp.tool()
+def move_file(source: str, destination: str, overwrite: bool = False) -> str:
+    """
+    Move or rename a file from source to destination. Fails if destination
+    already exists unless overwrite=True. Requires user permission via a
+    desktop popup (checked against the destination path) unless
+    pre-whitelisted.
+
+    Args:
+        source: path of the file to move
+        destination: path to move/rename it to
+        overwrite: if True, replace an existing file at destination
+    """
+    src = Path(source).expanduser()
+    dst = Path(destination).expanduser()
+    if not src.exists():
+        return f"ERROR: source file not found: {src}"
+    if not src.is_file():
+        return f"ERROR: source is not a file: {src}"
+    if dst.exists() and not overwrite:
+        return f"ERROR: destination already exists and overwrite=False: {dst}"
+
+    allowed, msg = permissions.request_file_permission(f"Move file to: {dst.name}", str(dst))
+    if not allowed:
+        return _fmt_denied(msg)
+
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.replace(dst)
+    except OSError as e:
+        return f"ERROR: {e}"
+    return f"[permission: {msg}]\nMoved {src} -> {dst}"
+
+
+# ---------------------------------------------------------------------------
+# Search (read-only, no permission needed)
+# ---------------------------------------------------------------------------
+
+def _iter_files(root: Path, include_hidden: bool):
+    for child in root.rglob("*"):
+        if child.is_dir():
+            continue
+        parts = child.relative_to(root).parts
+        if not include_hidden and any(part.startswith(".") for part in parts):
+            continue
+        if any(part in EXCLUDE_DIRS for part in parts):
+            continue
+        yield child
+
+
+@mcp.tool()
+def search(query: str, path: str = ".", case_sensitive: bool = False, max_results: int = 100) -> str:
+    """
+    Quick recursive text search for `query` inside files under `path`.
+    Skips common noise folders (.git, node_modules, __pycache__, venv, etc.)
+    and hidden files/folders. Read-only; no permission prompt required.
+
+    Args:
+        query: text to search for
+        path: directory to search within (default: current directory)
+        case_sensitive: whether the match should be case sensitive
+        max_results: cap on number of matching lines returned
+    """
+    root = Path(path).expanduser()
+    if not root.exists() or not root.is_dir():
+        return f"ERROR: not a directory: {root}"
+
+    needle = query if case_sensitive else query.lower()
+    results = []
+    for f in _iter_files(root, include_hidden=False):
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            haystack = line if case_sensitive else line.lower()
+            if needle in haystack:
+                results.append(f"{f}:{i}: {line.strip()}")
+                if len(results) >= max_results:
+                    return "\n".join(results) + f"\n\n[stopped at {max_results} results, refine your query or use search_deep]"
+    return "\n".join(results) if results else "No matches found."
+
+
+@mcp.tool()
+def search_deep(
+    query: str,
+    root: str = "~",
+    match_filenames: bool = True,
+    include_hidden: bool = True,
+    case_sensitive: bool = False,
+    max_results: int = 200,
+) -> str:
+    """
+    Thorough recursive search for `query` across a broader root (defaults to
+    the user's home directory). Unlike `search`, this also matches against
+    filenames by default and includes hidden files/folders. Use this when a
+    quick `search` doesn't find what you're looking for. Read-only; no
+    permission prompt required, but can be slow on large trees.
+
+    Args:
+        query: text to search for (in file contents and, optionally, names)
+        root: root directory to search from (default: home directory)
+        match_filenames: also report files whose name contains the query
+        include_hidden: include dotfiles and dot-directories
+        case_sensitive: whether matching is case sensitive
+        max_results: cap on number of results returned
+    """
+    root_path = Path(root).expanduser()
+    if not root_path.exists() or not root_path.is_dir():
+        return f"ERROR: not a directory: {root_path}"
+
+    needle = query if case_sensitive else query.lower()
+    results = []
+
+    for f in _iter_files(root_path, include_hidden=include_hidden):
+        if match_filenames:
+            name_cmp = f.name if case_sensitive else f.name.lower()
+            if fnmatch.fnmatch(name_cmp, f"*{needle}*"):
+                results.append(f"[name match] {f}")
+                if len(results) >= max_results:
+                    break
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            haystack = line if case_sensitive else line.lower()
+            if needle in haystack:
+                results.append(f"{f}:{i}: {line.strip()}")
+                if len(results) >= max_results:
+                    break
+        if len(results) >= max_results:
+            break
+
+    if not results:
+        return "No matches found."
+    if len(results) >= max_results:
+        results.append(f"[stopped at {max_results} results, narrow your query]")
+    return "\n".join(results)
+
+
+# ---------------------------------------------------------------------------
+# Web search / web fetch (network, read-only — no filesystem/command
+# permission prompt, since these don't touch the local machine's files or
+# processes. They do reach out to the network, which is the tradeoff for
+# giving the assistant live web access.)
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def web_search(query: str, max_results: int = 5) -> str:
+    """
+    Search the web for `query` and return a list of results (title, URL,
+    snippet). Uses DuckDuckGo's HTML endpoint, so no API key is required.
+    Read-only; no permission prompt (network access only, not local
+    filesystem or command execution).
+
+    Args:
+        query: the search query
+        max_results: maximum number of results to return (default 5)
+    """
+    try:
+        resp = requests.post(
+            "https://html.duckduckgo.com/html/",
+            data={"q": query},
+            headers=_HTTP_HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        return f"ERROR: web search failed: {e}"
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    results = []
+    for result in soup.select(".result"):
+        link = result.select_one("a.result__a")
+        if not link:
+            continue
+        title = link.get_text(strip=True)
+        href = link.get("href", "")
+        snippet_el = result.select_one(".result__snippet")
+        snippet = snippet_el.get_text(strip=True) if snippet_el else ""
+        results.append(f"{title}\n{href}\n{snippet}")
+        if len(results) >= max_results:
+            break
+
+    if not results:
+        return "No results found."
+    return "\n\n".join(results)
+
+
+@mcp.tool()
+def web_fetch(url: str, max_bytes: int = 100_000, extract_text: bool = True) -> str:
+    """
+    Fetch the contents of a web page at `url`. By default strips HTML down
+    to readable text (extract_text=True); set extract_text=False to get the
+    raw HTML instead. Read-only; no permission prompt (network access only,
+    not local filesystem or command execution). Only http(s) URLs are
+    allowed.
+
+    Args:
+        url: the URL to fetch (must start with http:// or https://)
+        max_bytes: truncate returned content to this many bytes if larger
+        extract_text: if True, strip tags/scripts/styles and return visible text
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return "ERROR: only http:// and https:// URLs are allowed"
+
+    try:
+        resp = requests.get(url, headers=_HTTP_HEADERS, timeout=20)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        return f"ERROR: fetch failed: {e}"
+
+    content_type = resp.headers.get("Content-Type", "")
+    if extract_text and "html" in content_type:
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+        text = "\n".join(
+            line.strip() for line in soup.get_text("\n").splitlines() if line.strip()
+        )
+    else:
+        text = resp.text
+
+    truncated = len(text.encode("utf-8", errors="ignore")) > max_bytes
+    text = text.encode("utf-8", errors="ignore")[:max_bytes].decode("utf-8", errors="ignore")
+    if truncated:
+        text += f"\n\n[... truncated, content exceeds {max_bytes} bytes ...]"
+    return text
+
+
+if __name__ == "__main__":
+    mcp.run()

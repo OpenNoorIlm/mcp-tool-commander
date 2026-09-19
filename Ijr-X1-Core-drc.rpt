@@ -1,0 +1,514 @@
+** Drc report for Ijr-X1-Core.kicad_pcb **
+** Created on 2026-08-23T17:14:33 **
+** Report includes: Errors, Warnings **
+
+** Found 152 DRC violations **
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(132.0000 mm, 217.0000 mm): Reference field of C10
+    @(130.0000 mm, 217.0000 mm): Reference field of C9
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(134.0000 mm, 217.0000 mm): Reference field of C11
+    @(132.0000 mm, 217.0000 mm): Reference field of C10
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(134.0000 mm, 217.0000 mm): Reference field of C11
+    @(136.0000 mm, 217.0000 mm): Reference field of C12
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(138.0000 mm, 217.0000 mm): Reference field of C13
+    @(136.0000 mm, 217.0000 mm): Reference field of C12
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(138.0000 mm, 217.0000 mm): Reference field of C13
+    @(140.0000 mm, 217.0000 mm): Reference field of C14
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(140.0000 mm, 217.0000 mm): Reference field of C14
+    @(142.0000 mm, 217.0000 mm): Reference field of C15
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(144.0000 mm, 217.0000 mm): Reference field of C16
+    @(142.0000 mm, 217.0000 mm): Reference field of C15
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(144.0000 mm, 217.0000 mm): Reference field of C16
+    @(146.0000 mm, 217.0000 mm): Reference field of C17
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(126.0000 mm, 209.0000 mm): Reference field of R10
+    @(124.0000 mm, 209.0000 mm): Reference field of R9
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(128.0000 mm, 209.0000 mm): Reference field of R11
+    @(126.0000 mm, 209.0000 mm): Reference field of R10
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(128.0000 mm, 209.0000 mm): Reference field of R11
+    @(130.0000 mm, 209.0000 mm): Reference field of R12
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(132.0000 mm, 209.0000 mm): Reference field of R13
+    @(130.0000 mm, 209.0000 mm): Reference field of R12
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(132.0000 mm, 209.0000 mm): Reference field of R13
+    @(134.0000 mm, 209.0000 mm): Reference field of R14
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(136.0000 mm, 209.0000 mm): Reference field of R15
+    @(134.0000 mm, 209.0000 mm): Reference field of R14
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(136.0000 mm, 209.0000 mm): Reference field of R15
+    @(138.0000 mm, 209.0000 mm): Reference field of R16
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(138.0000 mm, 209.0000 mm): Reference field of R16
+    @(140.0000 mm, 209.0000 mm): Reference field of R17
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(142.0000 mm, 209.0000 mm): Reference field of R18
+    @(140.0000 mm, 209.0000 mm): Reference field of R17
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(142.0000 mm, 209.0000 mm): Reference field of R18
+    @(144.0000 mm, 209.0000 mm): Reference field of R19
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(146.0000 mm, 209.0000 mm): Reference field of R20
+    @(144.0000 mm, 209.0000 mm): Reference field of R19
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(145.0000 mm, 75.0000 mm): Reference field of C39
+    @(143.0000 mm, 75.0000 mm): Reference field of C38
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(145.0000 mm, 75.0000 mm): Reference field of C39
+    @(147.0000 mm, 75.0000 mm): Reference field of C40
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(125.0000 mm, 105.0000 mm): Reference field of C21
+    @(127.0000 mm, 105.0000 mm): Reference field of C22
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(129.0000 mm, 105.0000 mm): Reference field of C23
+    @(127.0000 mm, 105.0000 mm): Reference field of C22
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(131.0000 mm, 105.0000 mm): Reference field of C24
+    @(129.0000 mm, 105.0000 mm): Reference field of C23
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(131.0000 mm, 105.0000 mm): Reference field of C24
+    @(133.0000 mm, 105.0000 mm): Reference field of C25
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(135.0000 mm, 105.0000 mm): Reference field of C26
+    @(133.0000 mm, 105.0000 mm): Reference field of C25
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(129.0000 mm, 103.0000 mm): Reference field of R22
+    @(127.0000 mm, 103.0000 mm): Reference field of R21
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(129.0000 mm, 103.0000 mm): Reference field of R22
+    @(131.0000 mm, 103.0000 mm): Reference field of R23
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(133.0000 mm, 103.0000 mm): Reference field of R24
+    @(131.0000 mm, 103.0000 mm): Reference field of R23
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(149.0000 mm, 75.0000 mm): Reference field of C41
+    @(147.0000 mm, 75.0000 mm): Reference field of C40
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(285.0000 mm, 205.0000 mm): Reference field of C34
+    @(283.0000 mm, 205.0000 mm): Reference field of C33
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(287.0000 mm, 205.0000 mm): Reference field of C35
+    @(285.0000 mm, 205.0000 mm): Reference field of C34
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(287.0000 mm, 205.0000 mm): Reference field of C35
+    @(289.0000 mm, 205.0000 mm): Reference field of C36
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(291.0000 mm, 205.0000 mm): Reference field of C37
+    @(289.0000 mm, 205.0000 mm): Reference field of C36
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(285.0000 mm, 209.0000 mm): Reference field of L21
+    @(287.0000 mm, 209.0000 mm): Reference field of L22
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(324.0000 mm, 104.0000 mm): Reference field of R32
+    @(322.0000 mm, 104.0000 mm): Reference field of R31
+[silk_overlap]: Silkscreen clearance
+    Rule: board setup constraints silk; warning
+    @(162.0000 mm, 42.0000 mm): Reference field of J_PWRLED
+    @(155.0000 mm, 42.0000 mm): Reference field of J_PWRBTN
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Battery'
+    Local override; warning
+    @(155.0000 mm, 62.0000 mm): Footprint BT1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(27.0000 mm, 33.0000 mm): Footprint C1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(132.0000 mm, 220.0000 mm): Footprint C10
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_THT'
+    Local override; warning
+    @(134.0000 mm, 220.0000 mm): Footprint C11
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(136.0000 mm, 220.0000 mm): Footprint C12
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(138.0000 mm, 220.0000 mm): Footprint C13
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_THT'
+    Local override; warning
+    @(140.0000 mm, 220.0000 mm): Footprint C14
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(142.0000 mm, 220.0000 mm): Footprint C15
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(144.0000 mm, 220.0000 mm): Footprint C16
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_THT'
+    Local override; warning
+    @(146.0000 mm, 220.0000 mm): Footprint C17
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(42.0000 mm, 33.0000 mm): Footprint C2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(125.0000 mm, 108.0000 mm): Footprint C21
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(127.0000 mm, 108.0000 mm): Footprint C22
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(129.0000 mm, 108.0000 mm): Footprint C23
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(131.0000 mm, 108.0000 mm): Footprint C24
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(133.0000 mm, 108.0000 mm): Footprint C25
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(135.0000 mm, 108.0000 mm): Footprint C26
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(175.0000 mm, 130.0000 mm): Footprint C27
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(57.0000 mm, 33.0000 mm): Footprint C3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(283.0000 mm, 208.0000 mm): Footprint C33
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(285.0000 mm, 208.0000 mm): Footprint C34
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(287.0000 mm, 208.0000 mm): Footprint C35
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(289.0000 mm, 208.0000 mm): Footprint C36
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(291.0000 mm, 208.0000 mm): Footprint C37
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(143.0000 mm, 78.0000 mm): Footprint C38
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(145.0000 mm, 78.0000 mm): Footprint C39
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(120.0000 mm, 220.0000 mm): Footprint C4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(147.0000 mm, 78.0000 mm): Footprint C40
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(149.0000 mm, 78.0000 mm): Footprint C41
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(122.0000 mm, 220.0000 mm): Footprint C5
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(124.0000 mm, 220.0000 mm): Footprint C6
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_THT'
+    Local override; warning
+    @(126.0000 mm, 220.0000 mm): Footprint C7
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(128.0000 mm, 220.0000 mm): Footprint C8
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    Local override; warning
+    @(130.0000 mm, 220.0000 mm): Footprint C9
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(30.0000 mm, 30.0000 mm): Footprint J1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(45.0000 mm, 30.0000 mm): Footprint J2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(60.0000 mm, 30.0000 mm): Footprint J3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Molex'
+    Local override; warning
+    @(20.0000 mm, 130.0000 mm): Footprint J_ATX24
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Card'
+    Local override; warning
+    @(75.0000 mm, 90.0000 mm): Footprint J_DIMM1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Card'
+    Local override; warning
+    @(75.0000 mm, 150.0000 mm): Footprint J_DIMM2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Card'
+    Local override; warning
+    @(175.0000 mm, 55.0000 mm): Footprint J_DIMM3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Card'
+    Local override; warning
+    @(175.0000 mm, 75.0000 mm): Footprint J_DIMM4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_Molex'
+    Local override; warning
+    @(20.0000 mm, 90.0000 mm): Footprint J_EPS8
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(140.0000 mm, 62.0000 mm): Footprint J_FAN1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(140.0000 mm, 68.0000 mm): Footprint J_FAN2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(110.0000 mm, 230.0000 mm): Footprint J_GPIO
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PCI-Express'
+    Local override; warning
+    @(20.0000 mm, 160.0000 mm): Footprint J_PCIE1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PCI-Express'
+    Local override; warning
+    @(20.0000 mm, 175.0000 mm): Footprint J_PCIE2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(155.0000 mm, 45.0000 mm): Footprint J_PWRBTN
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(162.0000 mm, 45.0000 mm): Footprint J_PWRLED
+[lib_footprint_issues]: The current configuration does not include the footprint library 'TestPoint'
+    Local override; warning
+    @(170.0000 mm, 45.0000 mm): Footprint J_PWROK
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(145.0000 mm, 55.0000 mm): Footprint J_PWR_BTN
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_PinHeader_2.54mm'
+    Local override; warning
+    @(135.0000 mm, 230.0000 mm): Footprint J_SWD
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(305.0000 mm, 200.0000 mm): Footprint J_USB_A1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(315.0000 mm, 200.0000 mm): Footprint J_USB_A2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(325.0000 mm, 200.0000 mm): Footprint J_USB_A3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Connector_USB'
+    Local override; warning
+    @(335.0000 mm, 200.0000 mm): Footprint J_USB_A4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(218.0000 mm, 100.0000 mm): Footprint L1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(218.0000 mm, 107.0000 mm): Footprint L2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(285.0000 mm, 212.0000 mm): Footprint L21
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(287.0000 mm, 212.0000 mm): Footprint L22
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(218.0000 mm, 114.0000 mm): Footprint L3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Inductor_SMD'
+    Local override; warning
+    @(218.0000 mm, 121.0000 mm): Footprint L4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(220.0000 mm, 88.0000 mm): Footprint Q1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(226.0000 mm, 88.0000 mm): Footprint Q2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(232.0000 mm, 88.0000 mm): Footprint Q3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(238.0000 mm, 88.0000 mm): Footprint Q4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(220.0000 mm, 95.0000 mm): Footprint Q5
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(226.0000 mm, 95.0000 mm): Footprint Q6
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(232.0000 mm, 95.0000 mm): Footprint Q7
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
+    Local override; warning
+    @(238.0000 mm, 95.0000 mm): Footprint Q8
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(30.0000 mm, 36.0000 mm): Footprint R1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(126.0000 mm, 212.0000 mm): Footprint R10
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(128.0000 mm, 212.0000 mm): Footprint R11
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(130.0000 mm, 212.0000 mm): Footprint R12
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(132.0000 mm, 212.0000 mm): Footprint R13
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(134.0000 mm, 212.0000 mm): Footprint R14
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(136.0000 mm, 212.0000 mm): Footprint R15
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(138.0000 mm, 212.0000 mm): Footprint R16
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(140.0000 mm, 212.0000 mm): Footprint R17
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(142.0000 mm, 212.0000 mm): Footprint R18
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(144.0000 mm, 212.0000 mm): Footprint R19
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(45.0000 mm, 36.0000 mm): Footprint R2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(146.0000 mm, 212.0000 mm): Footprint R20
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(127.0000 mm, 106.0000 mm): Footprint R21
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(129.0000 mm, 106.0000 mm): Footprint R22
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(131.0000 mm, 106.0000 mm): Footprint R23
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(133.0000 mm, 106.0000 mm): Footprint R24
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(280.0000 mm, 215.0000 mm): Footprint R29
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(60.0000 mm, 36.0000 mm): Footprint R3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(280.0000 mm, 220.0000 mm): Footprint R30
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(322.0000 mm, 107.0000 mm): Footprint R31
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(324.0000 mm, 107.0000 mm): Footprint R32
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(32.0000 mm, 36.0000 mm): Footprint R4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(47.0000 mm, 36.0000 mm): Footprint R5
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(62.0000 mm, 36.0000 mm): Footprint R6
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(120.0000 mm, 212.0000 mm): Footprint R7
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(122.0000 mm, 212.0000 mm): Footprint R8
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    Local override; warning
+    @(124.0000 mm, 212.0000 mm): Footprint R9
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(120.0000 mm, 215.0000 mm): Footprint U1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(285.0000 mm, 205.0000 mm): Footprint U12
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_QFP'
+    Local override; warning
+    @(145.0000 mm, 75.0000 mm): Footprint U13
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_SO'
+    Local override; warning
+    @(162.0000 mm, 62.0000 mm): Footprint U14
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_SO'
+    Local override; warning
+    @(130.0000 mm, 215.0000 mm): Footprint U2
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(225.0000 mm, 100.0000 mm): Footprint U3
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(235.0000 mm, 100.0000 mm): Footprint U4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(225.0000 mm, 115.0000 mm): Footprint U5
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(235.0000 mm, 115.0000 mm): Footprint U6
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_DFN_QFN'
+    Local override; warning
+    @(125.0000 mm, 110.0000 mm): Footprint U7
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Package_BGA'
+    Local override; warning
+    @(175.0000 mm, 125.0000 mm): Footprint U_CPU
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Crystal'
+    Local override; warning
+    @(285.0000 mm, 215.0000 mm): Footprint X1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Crystal'
+    Local override; warning
+    @(160.0000 mm, 75.0000 mm): Footprint X2
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(0.0000 mm, 0.0000 mm): Rectangle on Edge.Cuts
+    @(5.0000 mm, 5.0000 mm): PCB text 'Ijr-X1-Core Rev A' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(0.0000 mm, 0.0000 mm): Rectangle on Edge.Cuts
+    @(5.0000 mm, 10.0000 mm): PCB text '4L 350x250mm ENIG' on F.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(0.0000 mm, 0.0000 mm): Rectangle on Edge.Cuts
+    @(5.0000 mm, 14.0000 mm): PCB text 'i7-12700H Mini-ITX Class' on F.Silkscreen
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **
