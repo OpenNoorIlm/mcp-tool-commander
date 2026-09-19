@@ -897,30 +897,34 @@ def analyze_video(
     path: str,
     mode: str = "scene",
     fps: float = 1.0,
-    max_frames: int = 20,
-    max_width: int = 768,
-    jpeg_quality: int = 75,
+    max_frames: int = 8,
+    max_width: int = 512,
+    jpeg_quality: int = 60,
     dedup_threshold: int = 10,
     start_sec: float = 0.0,
     end_sec: float = 0.0,
+    return_mode: str = "both",
 ) -> str:
     """
-    Extract and return key frames from a video as base64-encoded JPEG images.
+    Extract key frames from a video and return them as base64 JPEG images so
+    the MCP client (Claude) can perform vision analysis on them directly.
     Uses FFmpeg for decoding/resizing and OpenCV for perceptual deduplication.
     Read-only; no permission prompt required.
 
     Args:
         path:             path to the video file
-        mode:             "scene"   — extract on scene changes (recommended)
+        mode:             "scene"   — pick best frame per batch (recommended, works for screencasts)
                           "uniform" — extract at fixed FPS interval
                           "keyframe"— extract codec I-frames only
         fps:              frames per second to sample (uniform mode only)
-        max_frames:       hard cap on returned frames (default 20, max 40)
-        max_width:        resize longest edge to this many pixels (default 768)
-        jpeg_quality:     JPEG compression quality 1-95 (default 75)
+        max_frames:       hard cap on returned frames (default 8, max 20)
+        max_width:        resize longest edge in pixels (default 512 — keeps tokens low)
+        jpeg_quality:     JPEG compression 1-95 (default 60)
         dedup_threshold:  perceptual hash hamming distance to drop near-duplicates (default 10)
-        start_sec:        clip start time in seconds (0 = beginning)
-        end_sec:          clip end time in seconds (0 = full video)
+        start_sec:        clip start in seconds (0 = beginning)
+        end_sec:          clip end in seconds (0 = full video)
+        return_mode:      "frames"  — base64 images only
+                          "both"    — metadata header + base64 images (default)
     """
     import cv2 as _cv2
 
@@ -947,7 +951,9 @@ def analyze_video(
         pass  # handled via -ss / -to flags below
 
     if mode == "scene":
-        filters.append("select='gt(scene,0.30)'")
+        # Use thumbnail filter to sample 1 frame/sec then keep only changed ones —
+        # works for both high-action video and low-variance screencasts
+        filters.append("thumbnail=30")
         filters.append("setpts=N/TB")
     elif mode == "keyframe":
         filters.append("select='eq(pict_type,I)'")
@@ -964,14 +970,16 @@ def analyze_video(
         cmd += ["-ss", str(start_sec)]
     if end_sec > 0:
         cmd += ["-to", str(end_sec)]
+    # Append pixel format normalisation — fixes non-full-range YUV sources
+    vf_full = vf + ",format=rgb24"
+
     cmd += [
         "-i", str(p),
-        "-vf", vf,
+        "-vf", vf_full,
         "-vsync", "vfr",
-        "-q:v", str(max(2, int((100 - jpeg_quality) / 5))),
         "-frames:v", str(max_frames * 3),   # over-extract, dedup will trim
-        "-f", "image2pipe",
-        "-vcodec", "mjpeg",
+        "-f", "rawvideo",
+        "-pix_fmt", "rgb24",
         "pipe:1",
     ]
 
@@ -990,52 +998,76 @@ def analyze_video(
     if not raw:
         return "ERROR: ffmpeg produced no output. Check the video file or try a different mode."
 
-    # Split MJPEG stream into individual JPEG frames
-    frames_raw = []
-    i = 0
-    while i < len(raw) - 1:
-        if raw[i] == 0xFF and raw[i + 1] == 0xD8:
-            end = raw.find(b"\xff\xd9", i + 2)
-            if end == -1:
-                break
-            frames_raw.append(raw[i:end + 2])
-            i = end + 2
-        else:
-            i += 1
+    # Probe frame dimensions from the source video so we can stride-split raw RGB
+    probe_cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=p=0",
+        str(p),
+    ]
+    try:
+        probe = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=15)
+        w_str, h_str = probe.stdout.strip().split(",")
+        src_w, src_h = int(w_str), int(h_str)
+    except Exception as e:
+        return f"ERROR: ffprobe failed to read dimensions: {e}"
 
-    if not frames_raw:
-        return "ERROR: could not parse any JPEG frames from ffmpeg output."
+    # Compute actual output dimensions after scale filter
+    if src_w >= src_h:
+        out_w = max_width
+        out_h = int(src_h * max_width / src_w) & ~1   # ensure even
+    else:
+        out_h = max_width
+        out_w = int(src_w * max_width / src_h) & ~1
 
-    # Perceptual dedup via OpenCV
+    frame_size = out_w * out_h * 3   # RGB24
+    if frame_size == 0 or len(raw) < frame_size:
+        return f"ERROR: raw output too small ({len(raw)}B) for a {out_w}x{out_h} frame."
+
+    n_frames_raw = len(raw) // frame_size
+
+    # Perceptual dedup via OpenCV; re-encode surviving frames to JPEG
     import numpy as _np
     kept = []
     seen_hashes: list[str] = []
 
-    for jpeg_bytes in frames_raw:
-        arr   = _np.frombuffer(jpeg_bytes, dtype=_np.uint8)
-        frame = _cv2.imdecode(arr, _cv2.IMREAD_COLOR)
-        if frame is None:
-            continue
-        ph = _phash(frame)
+    for fi in range(n_frames_raw):
+        chunk = raw[fi * frame_size:(fi + 1) * frame_size]
+        frame_rgb = _np.frombuffer(chunk, dtype=_np.uint8).reshape((out_h, out_w, 3))
+        frame_bgr = _cv2.cvtColor(frame_rgb, _cv2.COLOR_RGB2BGR)
+
+        ph = _phash(frame_bgr)
         if any(_hamming(ph, h) < dedup_threshold for h in seen_hashes):
             continue
         seen_hashes.append(ph)
-        kept.append(jpeg_bytes)
+
+        ok, buf = _cv2.imencode(".jpg", frame_bgr, [_cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
+        if not ok:
+            continue
+        kept.append(bytes(buf))
         if len(kept) >= max_frames:
             break
 
     if not kept:
         return "ERROR: all extracted frames were near-duplicates (try lowering dedup_threshold)."
 
-    # Encode to base64 and build response
-    lines = [
-        f"video: {p.name}",
-        f"mode: {mode}  frames_returned: {len(kept)}  max_width: {max_width}px  jpeg_quality: {jpeg_quality}",
-        "",
-    ]
+    max_frames = min(max_frames, 20)
+
+    # Build response — base64 frames so the MCP client (Claude) can do vision
+    lines = []
+    if return_mode in ("both",):
+        total_kb = sum(len(b) for b in kept) // 1024
+        lines += [
+            f"video: {p.name}",
+            f"mode: {mode} | frames: {len(kept)} | resolution: {out_w}x{out_h} | jpeg_quality: {jpeg_quality} | total: {total_kb}KB",
+            "",
+        ]
+
     for idx, jpeg_bytes in enumerate(kept, 1):
         b64 = _base64.b64encode(jpeg_bytes).decode("ascii")
-        lines.append(f"frame_{idx:03d} size={len(jpeg_bytes)}B")
+        if return_mode == "both":
+            lines.append(f"frame_{idx:03d} ({len(jpeg_bytes)//1024}KB):")
         lines.append(f"data:image/jpeg;base64,{b64}")
         lines.append("")
 
