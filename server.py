@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Dev
+# See LICENSE file for full license text.
+
 import os as _os
 """
 fs-shell-mcp: an MCP server giving an AI assistant (Claude, LM Studio, etc.)
