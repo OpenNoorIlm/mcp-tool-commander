@@ -892,39 +892,364 @@ def _hamming(a: str, b: str) -> int:
     return bin(int(a, 16) ^ int(b, 16)).count("1")
 
 
+def _probe_video(p: Path) -> dict:
+    """
+    Run ffprobe on a video file and return a dict of metadata.
+    Keys: width, height, duration_sec, fps, codec, pix_fmt, bit_rate,
+          audio_codec, audio_sample_rate, audio_channels, file_size_mb,
+          nb_frames (may be None), rotation (may be 0).
+    """
+    # Video stream
+    v_cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries",
+        "stream=width,height,r_frame_rate,codec_name,pix_fmt,bit_rate,nb_frames"
+        ":stream_tags=rotate",
+        "-of", "json",
+        str(p),
+    ]
+    # Audio stream
+    a_cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=codec_name,sample_rate,channels,bit_rate",
+        "-of", "json",
+        str(p),
+    ]
+    # Container / format
+    f_cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration,size,bit_rate,format_long_name",
+        "-of", "json",
+        str(p),
+    ]
+
+    def run(cmd):
+        import json
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        return json.loads(r.stdout) if r.stdout.strip() else {}
+
+    vj = run(v_cmd)
+    aj = run(a_cmd)
+    fj = run(f_cmd)
+
+    vs = (vj.get("streams") or [{}])[0]
+    as_ = (aj.get("streams") or [{}])[0]
+    fmt = fj.get("format", {})
+
+    # Parse fractional fps like "30000/1001"
+    raw_fps = vs.get("r_frame_rate", "0/1")
+    try:
+        num, den = raw_fps.split("/")
+        fps_val = round(int(num) / int(den), 3)
+    except Exception:
+        fps_val = 0.0
+
+    duration = float(fmt.get("duration") or 0)
+    size_bytes = int(fmt.get("size") or 0)
+
+    rotation = 0
+    tags = vs.get("tags", {})
+    if isinstance(tags, dict):
+        rotation = int(tags.get("rotate", 0))
+
+    nb_frames = vs.get("nb_frames")
+    if nb_frames:
+        try:
+            nb_frames = int(nb_frames)
+        except Exception:
+            nb_frames = None
+
+    return {
+        "width":              int(vs.get("width", 0)),
+        "height":             int(vs.get("height", 0)),
+        "duration_sec":       duration,
+        "fps":                fps_val,
+        "codec":              vs.get("codec_name", "unknown"),
+        "pix_fmt":            vs.get("pix_fmt", "unknown"),
+        "bit_rate_kbps":      round(int(vs.get("bit_rate") or fmt.get("bit_rate") or 0) / 1000, 1),
+        "nb_frames":          nb_frames,
+        "rotation":           rotation,
+        "audio_codec":        as_.get("codec_name", "none"),
+        "audio_sample_rate":  as_.get("sample_rate", "N/A"),
+        "audio_channels":     as_.get("channels", 0),
+        "audio_bitrate_kbps": round(int(as_.get("bit_rate") or 0) / 1000, 1),
+        "container":          fmt.get("format_long_name", "unknown"),
+        "file_size_mb":       round(size_bytes / 1_048_576, 2),
+    }
+
+
+def _build_frame_pipeline(
+    p: Path,
+    mode: str,
+    fps: float,
+    scene_threshold: float,
+    thumbnail_batch: int,
+    max_width: int,
+    max_frames: int,
+    start_sec: float,
+    end_sec: float,
+) -> list[str]:
+    """Build the ffmpeg command list for frame extraction."""
+    filters = []
+
+    if mode == "scene":
+        filters.append(f"thumbnail={thumbnail_batch}")
+        filters.append("setpts=N/TB")
+    elif mode == "scene_strict":
+        # true scene-cut detection — works well for high-action video
+        filters.append(f"select='gt(scene,{scene_threshold})'")
+        filters.append("setpts=N/TB")
+    elif mode == "keyframe":
+        filters.append("select='eq(pict_type,I)'")
+        filters.append("setpts=N/TB")
+    else:  # uniform — accepts any decimal fps e.g. 0.5, 0.1, 0.0005
+        # ffmpeg fps filter accepts fractions; express as rational for precision
+        # e.g. 0.5 → "1/2", 0.0005 → "1/2000"
+        if fps <= 0:
+            fps = 1.0
+        from fractions import Fraction
+        frac = Fraction(fps).limit_denominator(100000)
+        filters.append(f"fps={frac.numerator}/{frac.denominator}")
+
+    filters.append(
+        f"scale='if(gt(iw,ih),{max_width},-2)':'if(gt(iw,ih),-2,{max_width})'"
+    )
+    filters.append("format=rgb24")
+    vf = ",".join(filters)
+
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
+    if start_sec > 0:
+        cmd += ["-ss", str(start_sec)]
+    if end_sec > 0:
+        cmd += ["-to", str(end_sec)]
+    cmd += [
+        "-i", str(p),
+        "-vf", vf,
+        "-vsync", "vfr",
+        "-frames:v", str(max_frames * 4),   # over-extract; dedup trims
+        "-f", "rawvideo",
+        "-pix_fmt", "rgb24",
+        "pipe:1",
+    ]
+    return cmd
+
+
+def _extract_frames(
+    raw: bytes,
+    src_w: int,
+    src_h: int,
+    max_width: int,
+    max_frames: int,
+    jpeg_quality: int,
+    dedup_threshold: int,
+    blur_threshold: float,
+    brightness_min: float,
+    brightness_max: float,
+) -> tuple[list[bytes], int, int]:
+    """
+    Split raw RGB24 stream → JPEG bytes, applying dedup + quality filters.
+    Returns (kept_jpegs, out_w, out_h).
+    """
+    import cv2 as _cv2
+    import numpy as _np
+
+    # Compute scaled output dimensions
+    if src_w >= src_h:
+        out_w = max_width
+        out_h = int(src_h * max_width / src_w) & ~1
+    else:
+        out_h = max_width
+        out_w = int(src_w * max_width / src_h) & ~1
+
+    frame_size = out_w * out_h * 3
+    if frame_size == 0 or len(raw) < frame_size:
+        return [], out_w, out_h
+
+    n_raw = len(raw) // frame_size
+    kept: list[bytes] = []
+    seen_hashes: list[str] = []
+
+    for fi in range(n_raw):
+        chunk = raw[fi * frame_size:(fi + 1) * frame_size]
+        frame_rgb = _np.frombuffer(chunk, dtype=_np.uint8).reshape((out_h, out_w, 3))
+        frame_bgr = _cv2.cvtColor(frame_rgb, _cv2.COLOR_RGB2BGR)
+
+        # Optional: skip blurry frames
+        if blur_threshold > 0:
+            gray = _cv2.cvtColor(frame_bgr, _cv2.COLOR_BGR2GRAY)
+            laplacian_var = _cv2.Laplacian(gray, _cv2.CV_64F).var()
+            if laplacian_var < blur_threshold:
+                continue
+
+        # Optional: skip too-dark or too-bright frames
+        if brightness_min > 0 or brightness_max < 255:
+            mean_brightness = frame_bgr.mean()
+            if mean_brightness < brightness_min or mean_brightness > brightness_max:
+                continue
+
+        # Perceptual dedup
+        ph = _phash(frame_bgr)
+        if any(_hamming(ph, h) < dedup_threshold for h in seen_hashes):
+            continue
+        seen_hashes.append(ph)
+
+        ok, buf = _cv2.imencode(
+            ".jpg", frame_bgr,
+            [_cv2.IMWRITE_JPEG_QUALITY, jpeg_quality,
+             _cv2.IMWRITE_JPEG_OPTIMIZE, 1]
+        )
+        if not ok:
+            continue
+        kept.append(bytes(buf))
+        if len(kept) >= max_frames:
+            break
+
+    return kept, out_w, out_h
+
+
+@mcp.tool()
+def details_video(path: str) -> str:
+    """
+    Return full technical metadata for a video file without extracting any
+    frames. Includes resolution, duration, FPS, codec, pixel format,
+    bitrate, audio info, rotation, container format, and file size.
+    Read-only; no permission prompt required.
+
+    Args:
+        path: path to the video file
+    """
+    p = Path(path).expanduser()
+    if not p.exists() or not p.is_file():
+        return f"ERROR: file not found: {p}"
+
+    _, has_ffmpeg = _check_deps()
+    if not has_ffmpeg:
+        return "ERROR: ffmpeg/ffprobe binary not found in PATH"
+
+    try:
+        m = _probe_video(p)
+    except Exception as e:
+        return f"ERROR: ffprobe failed: {e}"
+
+    dur = m["duration_sec"]
+    hh, rem = divmod(int(dur), 3600)
+    mm, ss  = divmod(rem, 60)
+
+    lines = [
+        f"file:            {p.name}",
+        f"size:            {m['file_size_mb']} MB",
+        f"container:       {m['container']}",
+        f"",
+        f"--- Video ---",
+        f"resolution:      {m['width']}x{m['height']}"
+            + (f"  (rotated {m['rotation']}°)" if m['rotation'] else ""),
+        f"duration:        {hh:02d}:{mm:02d}:{ss:02d}  ({dur:.3f}s)",
+        f"fps:             {m['fps']}",
+        f"total frames:    {m['nb_frames'] if m['nb_frames'] else 'N/A (not in header)'}",
+        f"codec:           {m['codec']}",
+        f"pixel format:    {m['pix_fmt']}",
+        f"bitrate:         {m['bit_rate_kbps']} kbps",
+        f"",
+        f"--- Audio ---",
+        f"codec:           {m['audio_codec']}",
+        f"sample rate:     {m['audio_sample_rate']} Hz",
+        f"channels:        {m['audio_channels']}",
+        f"bitrate:         {m['audio_bitrate_kbps']} kbps",
+    ]
+    return "\n".join(lines)
+
+
 @mcp.tool()
 def analyze_video(
     path: str,
+    # --- extraction mode ---
     mode: str = "scene",
     fps: float = 1.0,
+    scene_threshold: float = 0.30,
+    thumbnail_batch: int = 30,
+    # --- frame limits ---
     max_frames: int = 8,
-    max_width: int = 512,
-    jpeg_quality: int = 60,
-    dedup_threshold: int = 10,
     start_sec: float = 0.0,
     end_sec: float = 0.0,
+    # --- output size & quality ---
+    max_width: int = 512,
+    jpeg_quality: int = 60,
+    # --- dedup & filtering ---
+    dedup_threshold: int = 10,
+    blur_threshold: float = 0.0,
+    brightness_min: float = 0.0,
+    brightness_max: float = 255.0,
+    # --- response format ---
     return_mode: str = "both",
+    include_metadata: bool = False,
 ) -> str:
     """
     Extract key frames from a video and return them as base64 JPEG images so
-    the MCP client (Claude) can perform vision analysis on them directly.
+    the MCP client (Claude) can perform vision analysis directly.
     Uses FFmpeg for decoding/resizing and OpenCV for perceptual deduplication.
     Read-only; no permission prompt required.
 
     Args:
-        path:             path to the video file
-        mode:             "scene"   — pick best frame per batch (recommended, works for screencasts)
-                          "uniform" — extract at fixed FPS interval
-                          "keyframe"— extract codec I-frames only
-        fps:              frames per second to sample (uniform mode only)
-        max_frames:       hard cap on returned frames (default 8, max 20)
-        max_width:        resize longest edge in pixels (default 512 — keeps tokens low)
-        jpeg_quality:     JPEG compression 1-95 (default 60)
-        dedup_threshold:  perceptual hash hamming distance to drop near-duplicates (default 10)
-        start_sec:        clip start in seconds (0 = beginning)
-        end_sec:          clip end in seconds (0 = full video)
-        return_mode:      "frames"  — base64 images only
-                          "both"    — metadata header + base64 images (default)
+        path:              path to the video file
+
+        mode:              extraction strategy —
+                             "scene"       best representative frame per N-frame batch
+                                           (thumbnail filter — great for screencasts &
+                                            low-motion content, default)
+                             "scene_strict" scene-cut detection via pixel difference score;
+                                           use scene_threshold to tune sensitivity
+                             "uniform"     fixed time interval sampling; supports any
+                                           decimal fps e.g. 1.0, 0.5, 0.1, 0.0005
+                             "keyframe"    codec I-frames only (fastest seek points)
+
+        fps:               frames per second for uniform mode — accepts any positive
+                           decimal, including very slow rates:
+                             1.0    = 1 frame every second
+                             0.5    = 1 frame every 2 seconds
+                             0.1    = 1 frame every 10 seconds
+                             0.0005 = 1 frame every ~33 minutes
+                           (ignored in scene / scene_strict / keyframe modes)
+
+        scene_threshold:   sensitivity for scene_strict mode — float 0.0–1.0;
+                           lower = more sensitive (detects subtle changes),
+                           higher = only hard cuts. Default 0.30.
+
+        thumbnail_batch:   frame batch size for scene mode (default 30 = ~1s at 30fps);
+                           smaller = finer sampling, larger = coarser.
+
+        max_frames:        hard cap on returned frames (default 8, max 40)
+
+        start_sec:         clip start time in seconds (0 = beginning of file)
+        end_sec:           clip end time in seconds (0 = end of file)
+
+        max_width:         resize longest edge to this many pixels (default 512);
+                           use 256 for minimal tokens, 768 for higher detail
+
+        jpeg_quality:      JPEG compression quality 1–95 (default 60);
+                           lower = smaller base64 payload, higher = more detail
+
+        dedup_threshold:   perceptual hash Hamming distance below which a frame is
+                           considered a duplicate and skipped (default 10);
+                           0 = keep all frames, 64 = extremely aggressive dedup
+
+        blur_threshold:    Laplacian variance floor — frames below this are considered
+                           blurry and skipped (default 0.0 = disabled);
+                           try 50–200 to filter motion blur or out-of-focus frames
+
+        brightness_min:    skip frames whose mean pixel brightness is below this
+                           (default 0.0 = disabled); range 0–255
+
+        brightness_max:    skip frames whose mean pixel brightness is above this
+                           (default 255.0 = disabled); range 0–255;
+                           e.g. set 240 to skip blown-out / all-white frames
+
+        return_mode:       "frames" — base64 images only (no header text)
+                           "both"   — metadata header + base64 images (default)
+
+        include_metadata:  if True, prepend full video metadata (same output as
+                           details_video) before the frames (default False)
     """
     import cv2 as _cv2
 
@@ -933,72 +1258,45 @@ def analyze_video(
         return f"ERROR: file not found: {p}"
 
     suffix = p.suffix.lower()
-    known_exts = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v", ".ts", ".wmv"}
+    known_exts = {
+        ".mp4", ".mkv", ".avi", ".mov", ".webm",
+        ".flv", ".m4v", ".ts", ".wmv", ".3gp", ".ogv",
+    }
     if suffix not in known_exts:
-        return f"ERROR: unrecognised video extension '{suffix}'. Supported: {', '.join(sorted(known_exts))}"
+        return (
+            f"ERROR: unrecognised video extension '{suffix}'. "
+            f"Supported: {', '.join(sorted(known_exts))}"
+        )
 
     has_cv2, has_ffmpeg = _check_deps()
     if not has_cv2:
-        return "ERROR: opencv-contrib-python is not installed (pip install opencv-contrib-python)"
+        return "ERROR: opencv-contrib-python is not installed"
     if not has_ffmpeg:
         return "ERROR: ffmpeg binary not found in PATH"
 
-    max_frames = min(max_frames, 40)
+    max_frames = min(max(1, max_frames), 40)
+    jpeg_quality = max(1, min(95, jpeg_quality))
 
-    # Build ffmpeg filter chain
-    filters = []
-    if start_sec > 0 or end_sec > 0:
-        pass  # handled via -ss / -to flags below
+    # --- optional metadata header ---
+    meta_block = ""
+    if include_metadata:
+        try:
+            m = _probe_video(p)
+            dur = m["duration_sec"]
+            hh, rem = divmod(int(dur), 3600)
+            mm2, ss = divmod(rem, 60)
+            meta_block = (
+                f"[metadata] {p.name} | "
+                f"{m['width']}x{m['height']} | "
+                f"{hh:02d}:{mm2:02d}:{ss:02d} | "
+                f"{m['fps']} fps | "
+                f"{m['codec']} | "
+                f"{m['file_size_mb']} MB\n"
+            )
+        except Exception as e:
+            meta_block = f"[metadata error: {e}]\n"
 
-    if mode == "scene":
-        # Use thumbnail filter to sample 1 frame/sec then keep only changed ones —
-        # works for both high-action video and low-variance screencasts
-        filters.append("thumbnail=30")
-        filters.append("setpts=N/TB")
-    elif mode == "keyframe":
-        filters.append("select='eq(pict_type,I)'")
-        filters.append("setpts=N/TB")
-    else:  # uniform
-        filters.append(f"fps={fps}")
-
-    filters.append(f"scale='if(gt(iw,ih),{max_width},-2)':'if(gt(iw,ih),-2,{max_width})'")
-
-    vf = ",".join(filters)
-
-    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error"]
-    if start_sec > 0:
-        cmd += ["-ss", str(start_sec)]
-    if end_sec > 0:
-        cmd += ["-to", str(end_sec)]
-    # Append pixel format normalisation — fixes non-full-range YUV sources
-    vf_full = vf + ",format=rgb24"
-
-    cmd += [
-        "-i", str(p),
-        "-vf", vf_full,
-        "-vsync", "vfr",
-        "-frames:v", str(max_frames * 3),   # over-extract, dedup will trim
-        "-f", "rawvideo",
-        "-pix_fmt", "rgb24",
-        "pipe:1",
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, timeout=120)
-    except subprocess.TimeoutExpired:
-        return "ERROR: ffmpeg timed out after 120s"
-    except OSError as e:
-        return f"ERROR: ffmpeg failed to launch: {e}"
-
-    if result.returncode != 0:
-        stderr = result.stderr.decode("utf-8", errors="replace")[:500]
-        return f"ERROR: ffmpeg exited {result.returncode}: {stderr}"
-
-    raw = result.stdout
-    if not raw:
-        return "ERROR: ffmpeg produced no output. Check the video file or try a different mode."
-
-    # Probe frame dimensions from the source video so we can stride-split raw RGB
+    # --- probe source dimensions for stride math ---
     probe_cmd = [
         "ffprobe", "-v", "error",
         "-select_streams", "v:0",
@@ -1013,54 +1311,55 @@ def analyze_video(
     except Exception as e:
         return f"ERROR: ffprobe failed to read dimensions: {e}"
 
-    # Compute actual output dimensions after scale filter
-    if src_w >= src_h:
-        out_w = max_width
-        out_h = int(src_h * max_width / src_w) & ~1   # ensure even
-    else:
-        out_h = max_width
-        out_w = int(src_w * max_width / src_h) & ~1
+    # --- build and run ffmpeg pipeline ---
+    cmd = _build_frame_pipeline(
+        p, mode, fps, scene_threshold, thumbnail_batch,
+        max_width, max_frames, start_sec, end_sec,
+    )
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        return "ERROR: ffmpeg timed out after 180s"
+    except OSError as e:
+        return f"ERROR: ffmpeg failed to launch: {e}"
 
-    frame_size = out_w * out_h * 3   # RGB24
-    if frame_size == 0 or len(raw) < frame_size:
-        return f"ERROR: raw output too small ({len(raw)}B) for a {out_w}x{out_h} frame."
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace")[:600]
+        return f"ERROR: ffmpeg exited {result.returncode}: {stderr}"
 
-    n_frames_raw = len(raw) // frame_size
+    raw = result.stdout
+    if not raw:
+        return (
+            "ERROR: ffmpeg produced no output. "
+            "Try mode='uniform' with a low fps, or check the file path."
+        )
 
-    # Perceptual dedup via OpenCV; re-encode surviving frames to JPEG
-    import numpy as _np
-    kept = []
-    seen_hashes: list[str] = []
-
-    for fi in range(n_frames_raw):
-        chunk = raw[fi * frame_size:(fi + 1) * frame_size]
-        frame_rgb = _np.frombuffer(chunk, dtype=_np.uint8).reshape((out_h, out_w, 3))
-        frame_bgr = _cv2.cvtColor(frame_rgb, _cv2.COLOR_RGB2BGR)
-
-        ph = _phash(frame_bgr)
-        if any(_hamming(ph, h) < dedup_threshold for h in seen_hashes):
-            continue
-        seen_hashes.append(ph)
-
-        ok, buf = _cv2.imencode(".jpg", frame_bgr, [_cv2.IMWRITE_JPEG_QUALITY, jpeg_quality])
-        if not ok:
-            continue
-        kept.append(bytes(buf))
-        if len(kept) >= max_frames:
-            break
+    # --- extract, filter, dedup frames ---
+    kept, out_w, out_h = _extract_frames(
+        raw, src_w, src_h, max_width, max_frames,
+        jpeg_quality, dedup_threshold,
+        blur_threshold, brightness_min, brightness_max,
+    )
 
     if not kept:
-        return "ERROR: all extracted frames were near-duplicates (try lowering dedup_threshold)."
+        return (
+            "ERROR: no frames survived filtering. "
+            "Try lowering dedup_threshold, blur_threshold, or adjusting brightness limits."
+        )
 
-    max_frames = min(max_frames, 20)
-
-    # Build response — base64 frames so the MCP client (Claude) can do vision
+    # --- build response ---
     lines = []
-    if return_mode in ("both",):
+    if meta_block:
+        lines.append(meta_block)
+
+    if return_mode == "both":
         total_kb = sum(len(b) for b in kept) // 1024
         lines += [
             f"video: {p.name}",
-            f"mode: {mode} | frames: {len(kept)} | resolution: {out_w}x{out_h} | jpeg_quality: {jpeg_quality} | total: {total_kb}KB",
+            f"mode: {mode} | frames: {len(kept)} | "
+            f"resolution: {out_w}x{out_h} | "
+            f"jpeg_quality: {jpeg_quality} | "
+            f"total: {total_kb}KB",
             "",
         ]
 
